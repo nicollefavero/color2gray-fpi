@@ -36,9 +36,8 @@ if __name__ == "__main__":
     h = range(height)
     w = range(width)
 
-    # edit parameters here
     # defaults are alpha = 10, theta = 45, neighbourhood_size = image_size
-    alpha = 25
+    alpha = 10
     theta = 45
     neighbourhood_size = (width, height)
 
@@ -52,6 +51,7 @@ if __name__ == "__main__":
     # initialize target difference matrix
     target_difference = np.zeros((height, width), dtype=float)
 
+    # Lumiance List, Channel A List, Channel B List
     LiList = []
     AiList = []
     BiList = []
@@ -80,6 +80,7 @@ if __name__ == "__main__":
         target_difference[yj][xj] = calculateTargetDifference(alpha, theta, delta_L, delta_A, delta_B)
 
 
+    # solves the optimization using the target differences
     for yi in hn:
       for xi in wn:
         if yi - 1 < 0:
@@ -92,6 +93,7 @@ if __name__ == "__main__":
 
     error = 0
 
+    # reduces the brightness error by calculating the average distance from the gray image
     for yi in h:
       for xi in w:
         error += (final_image[yi][xi] - gray_image[yi][xi])[0]
