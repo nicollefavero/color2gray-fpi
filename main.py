@@ -9,10 +9,7 @@ def crunch(alpha, x):
   # variations around zero almost untouched
   return alpha * math.tanh(x/alpha)
 
-def euclidianNorm(vector):
-  # Transform a 2D vector into a single dimension value
-  return np.linalg.norm(vector)
-
+  
 def calculateTargetDifference(alpha, theta, delta_lum, delta_A, delta_B):
   # normalized vector defined by theta (relative to the delta_A 
   delta_crom_norm = math.sqrt(math.pow(delta_A, 2) + math.pow(delta_B, 2))
@@ -52,52 +49,54 @@ if __name__ == "__main__":
     gray_image = cv.cvtColor(original_image, cv.COLOR_BGR2GRAY)
     final_image = np.zeros_like(original_image)
 
+    # initialize target difference matrix
+    target_difference = np.zeros((height, width), dtype=float)
+
     previous_Li = None
+    LiList = []
+    AiList = []
+    BiList = []
 
     # i pixel and j is its neighbour
     # go through each pixel i of the original image
     for yi in h:
-        for xi in w:
+      for xi in w:
 
-            Li, Ai, Bi = image_lab[yi][xi]
+        Li, Ai, Bi = image_lab[yi][xi]
+        LiList.append(Li)
+        AiList.append(Ai)
+        BiList.append(Bi)
 
-            # initialize target difference matrix
-            target_difference = np.zeros((height, width), dtype=float)
+    # go through each pixel j of the neighbourhood size
+    for yj in hn:
+      for xj in wn:
+        Lj, Aj, Bj = image_lab[yj][xj]
 
-            # sum of optimization least squares
-            sum = 0
+        delta_L = int(LiList[yj]) - Lj   # black - white
+        delta_A = int(AiList[yj]) - Aj   # blue - yellow
+        delta_B = int(BiList[yj]) - Bj   # green - red
 
-            # go through each pixel j of the neighbourhood size
-            for yj in hn:
-                for xj in wn:
-                    
-                    Lj, Aj, Bj = image_lab[yj][xj]
-
-                    delta_L = int(Li) - Lj   # black - white
-                    delta_A = int(Ai) - Aj   # blue - yellow
-                    delta_B = int(Bi) - Bj   # green - red
-
-                    # delta_C is a 2D vector related to the chromatic difference
-                    #delta_C = [delta_A, delta_B]
-
-                    # a pseudocode to explain how target difference works: target_difference[yi][xi][yj][xj] = int()
-                    # here, a simplified version because the neighbours are the same for a given pixel
-                    target_difference[yj][xj] = calculateTargetDifference(alpha, theta, delta_L, delta_A, delta_B)
+        # a pseudocode to explain how target difference works: target_difference[yi][xi][yj][xj] = int()
+        # here, a simplified version because the neighbours are the same for a given pixel
+        target_difference[yj][xj] = calculateTargetDifference(alpha, theta, delta_L, delta_A, delta_B)
 
 
-            # transforms this target_difference[][][yj][xj] into a integer for each pixel [yi][xi] through a sum
-            # check how to compute least squares of function below, see: https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.leastsq.html
+        # transforms this target_difference[][][yj][xj] into a integer for each pixel [yi][xi] through a sum
+        # check how to compute least squares of function below, see: https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.leastsq.html
 
-            #target_diff_dim = ((gray_image[yi][xi] - gray_image[yj][xj]) - target_difference[yj][xj]) ** 2
-            if yi - 1 < 0:
-              target_diff_dim = 0
-            else:
-              target_diff_dim = np.sum(target_difference[yi]) - np.sum(target_difference[yi - 1]) + width * height * previous_Li
-              target_diff_dim /= (width * height)
+        #target_diff_dim = ((gray_image[yi][xi] - gray_image[yj][xj]) - target_difference[yj][xj]) ** 2
 
-            previous_Li = Li
-            
-            
-            final_image[yi][xi] = np.uint8(np.clip(target_diff_dim, 0, 255))
+
+    for yi in range(neighbourhood_size[1] - 1):
+      for xi in range(neighbourhood_size[0] - 1):
+        if yi - 1 < 0:
+          target_diff_dim = 0
+        else:
+          target_diff_dim = np.sum(target_difference[yi + 1]) - np.sum(target_difference[yi]) + width * height * LiList[yi * width + xi]
+          target_diff_dim /= (width * height)
+
+        previous_Li = Li
+        
+        final_image[yi][xi] = np.uint8(np.clip(target_diff_dim, 0, 255))
         
     cv.imwrite("output.png", final_image)
