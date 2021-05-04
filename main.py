@@ -7,23 +7,21 @@ def crunch(alpha, x):
   # This function allows us to compress large-amplitude values
   # into the valid range, while leaving small yet significant
   # variations around zero almost untouched
-
   return alpha * math.tanh(x/alpha)
 
 def euclidianNorm(vector):
   # Transform a 2D vector into a single dimension value
   return np.linalg.norm(vector)
 
-def calculateTargetDifference(alpha, theta, delta_lum, delta_crom):
+def calculateTargetDifference(alpha, theta, delta_lum, delta_A, delta_B):
   # normalized vector defined by theta (relative to the delta_A 
-  # axis (???))
-  norm_vector_theta = [math.cos(theta), math.sin(theta)]
-  delta_crom_norm = euclidianNorm(delta_crom)
+  delta_crom_norm = math.sqrt(math.pow(delta_A, 2) + math.pow(delta_B, 2))
+  dot_product_AB_theta = delta_A * math.cos(theta) + delta_B * math.sin(theta)
   
   if np.abs(delta_lum) > crunch(alpha, delta_crom_norm):
     return delta_lum
 
-  elif np.dot(delta_crom, norm_vector_theta) >= 0:
+  elif dot_product_AB_theta >= 0:
     return crunch(alpha, delta_crom_norm)
 
   else:
@@ -32,7 +30,7 @@ def calculateTargetDifference(alpha, theta, delta_lum, delta_crom):
 if __name__ == "__main__":
 
     # edit here image name to be convert to grayscale
-    image_name = "original_reduced.png"
+    image_name = "original_color_image.png"
     original_image = cv.imread(image_name)
     image_lab = cv.cvtColor(original_image, cv.COLOR_BGR2LAB)
 
@@ -53,6 +51,8 @@ if __name__ == "__main__":
     # convert the original image to normal grayscale and initialize output
     gray_image = cv.cvtColor(original_image, cv.COLOR_BGR2GRAY)
     final_image = np.zeros_like(original_image)
+
+    previous_Li = None
 
     # i pixel and j is its neighbour
     # go through each pixel i of the original image
@@ -78,17 +78,26 @@ if __name__ == "__main__":
                     delta_B = int(Bi) - Bj   # green - red
 
                     # delta_C is a 2D vector related to the chromatic difference
-                    delta_C = [delta_A, delta_B]
+                    #delta_C = [delta_A, delta_B]
 
                     # a pseudocode to explain how target difference works: target_difference[yi][xi][yj][xj] = int()
                     # here, a simplified version because the neighbours are the same for a given pixel
-                    target_difference[yj][xj] = calculateTargetDifference(alpha, theta, delta_L, delta_C)
+                    target_difference[yj][xj] = calculateTargetDifference(alpha, theta, delta_L, delta_A, delta_B)
 
 
             # transforms this target_difference[][][yj][xj] into a integer for each pixel [yi][xi] through a sum
             # check how to compute least squares of function below, see: https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.leastsq.html
-            target_diff_dim = ((gray_image[yi][xi] - gray_image[yj][xj]) - target_difference[yj][xj]) ** 2
-                  
-            final_image[yi][xi] = np.uint8(np.clip(sum, 0, 255))
+
+            #target_diff_dim = ((gray_image[yi][xi] - gray_image[yj][xj]) - target_difference[yj][xj]) ** 2
+            if yi - 1 < 0:
+              target_diff_dim = 0
+            else:
+              target_diff_dim = np.sum(target_difference[yi]) - np.sum(target_difference[yi - 1]) + width * height * previous_Li
+              target_diff_dim /= (width * height)
+
+            previous_Li = Li
+            
+            
+            final_image[yi][xi] = np.uint8(np.clip(target_diff_dim, 0, 255))
         
     cv.imwrite("output.png", final_image)
