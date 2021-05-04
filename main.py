@@ -9,7 +9,7 @@ def crunch(alpha, x):
   # variations around zero almost untouched
   return alpha * math.tanh(x/alpha)
 
-  
+
 def calculateTargetDifference(alpha, theta, delta_lum, delta_A, delta_B):
   # normalized vector defined by theta (relative to the delta_A 
   delta_crom_norm = math.sqrt(math.pow(delta_A, 2) + math.pow(delta_B, 2))
@@ -38,7 +38,7 @@ if __name__ == "__main__":
 
     # edit parameters here
     # defaults are alpha = 10, theta = 45, neighbourhood_size = image_size
-    alpha = 10
+    alpha = 25
     theta = 45
     neighbourhood_size = (width, height)
 
@@ -52,7 +52,6 @@ if __name__ == "__main__":
     # initialize target difference matrix
     target_difference = np.zeros((height, width), dtype=float)
 
-    previous_Li = None
     LiList = []
     AiList = []
     BiList = []
@@ -81,22 +80,27 @@ if __name__ == "__main__":
         target_difference[yj][xj] = calculateTargetDifference(alpha, theta, delta_L, delta_A, delta_B)
 
 
-        # transforms this target_difference[][][yj][xj] into a integer for each pixel [yi][xi] through a sum
-        # check how to compute least squares of function below, see: https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.leastsq.html
-
-        #target_diff_dim = ((gray_image[yi][xi] - gray_image[yj][xj]) - target_difference[yj][xj]) ** 2
-
-
-    for yi in range(neighbourhood_size[1] - 1):
-      for xi in range(neighbourhood_size[0] - 1):
+    for yi in hn:
+      for xi in wn:
         if yi - 1 < 0:
           target_diff_dim = 0
         else:
-          target_diff_dim = np.sum(target_difference[yi + 1]) - np.sum(target_difference[yi]) + width * height * LiList[yi * width + xi]
+          target_diff_dim = np.sum(target_difference[yi]) - np.sum(target_difference[yi - 1]) + width * height * LiList[yi * width + xi - 1]
           target_diff_dim /= (width * height)
+        
+        final_image[yi][xi] = target_diff_dim
 
-        previous_Li = Li
-        
-        final_image[yi][xi] = np.uint8(np.clip(target_diff_dim, 0, 255))
-        
+    error = 0
+
+    for yi in h:
+      for xi in w:
+        error += (final_image[yi][xi] - gray_image[yi][xi])[0]
+
+    error /= (width * height)
+    error = np.uint8(error)
+
+    for yi in h:
+      for xi in w:
+        final_image[yi][xi] -= error
+    
     cv.imwrite("output.png", final_image)
