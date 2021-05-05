@@ -18,7 +18,8 @@ class ImageSelectionView(Tk):
             "Car",
             "Construction",
             "Hidden Number",
-            "Island Map"
+            "Island Map",
+            "Square"
         ]
 
         # Setups dropdown menu
@@ -67,6 +68,8 @@ class ImageSelectionView(Tk):
             imagePath = 'images/hiddenNumber'
         elif selectedOption == 'Island Map':
             imagePath = 'images/mapIsland'
+        elif selectedOption == 'Square':
+            imagePath = 'images/square'
         
         extension = '.png'
 

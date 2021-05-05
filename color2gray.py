@@ -27,7 +27,7 @@ def calculateTargetDifference(alpha, theta, delta_lum, delta_A, delta_B):
 def colorToGray(imagePath):
 
     # edit here image name to be convert to grayscale
-    #image_name = "images/sunset.png"
+    #image_name = "images/mapIslandSmall.png"
     image_name = imagePath
     original_image = cv.imread(image_name)
     image_lab = cv.cvtColor(original_image, cv.COLOR_BGR2LAB)
@@ -38,24 +38,26 @@ def colorToGray(imagePath):
     w = range(width)
 
     # defaults are alpha = 10, theta = 45, neighbourhood_size = image_size
-    alpha = 10
+    alpha = 20
     theta = 45
     neighbourhood_size = (width, height)
 
     hn = range(neighbourhood_size[1])
     wn = range(neighbourhood_size[0])
+    N = width * height
 
     # convert the original image to normal grayscale and initialize output
     gray_image = cv.cvtColor(original_image, cv.COLOR_BGR2GRAY)
     final_image = np.zeros_like(original_image)
 
     # initialize target difference matrix
-    target_difference = np.zeros((height, width), dtype=float)
+    #target_difference = np.zeros((height, width), dtype=float)
+    target_difference = np.zeros(N, dtype=float)
 
     # Lumiance List, Channel A List, Channel B List
-    LiList = []
-    AiList = []
-    BiList = []
+    LiList = np.zeros(N, dtype=float)
+    AiList = np.zeros(N, dtype=float)
+    BiList = np.zeros(N, dtype=float)
 
     # i pixel and j is its neighbour
     # go through each pixel i of the original image
@@ -63,47 +65,27 @@ def colorToGray(imagePath):
       for xi in w:
 
         Li, Ai, Bi = image_lab[yi][xi]
-        LiList.append(Li)
-        AiList.append(Ai)
-        BiList.append(Bi)
+        LiList[(yi * width + xi)] = Li
+        AiList[(yi * width + xi)] = Ai
+        BiList[(yi * width + xi)] = Bi
 
     # go through each pixel j of the neighbourhood size
-    for yj in hn:
-      for xj in wn:
-        Lj, Aj, Bj = image_lab[yj][xj]
+    for yi in range(N):
+      for xi in range(N):
+        delta_L = LiList[yi] - LiList[xi]
+        delta_A = AiList[yi] - AiList[xi]
+        delta_B = BiList[yi] - BiList[xi]
 
-        delta_L = int(LiList[yj]) - Lj   # black - white
-        delta_A = int(AiList[yj]) - Aj   # blue - yellow
-        delta_B = int(BiList[yj]) - Bj   # green - red
-
-        # a pseudocode to explain how target difference works: target_difference[yi][xi][yj][xj] = int()
-        # here, a simplified version because the neighbours are the same for a given pixel
-        target_difference[yj][xj] = calculateTargetDifference(alpha, theta, delta_L, delta_A, delta_B)
+        target_difference[yi] += calculateTargetDifference(alpha, theta, delta_L, delta_A, delta_B)        
 
 
     # solves the optimization using the target differences
-    for yi in hn:
-      for xi in wn:
-        if yi - 1 < 0:
-          target_diff_dim = 0
-        else:
-          target_diff_dim = np.sum(target_difference[yi]) - np.sum(target_difference[yi - 1]) + width * height * LiList[yi * width + xi - 1]
-          target_diff_dim /= (width * height)
-        
-        final_image[yi][xi] = target_diff_dim
+    for i in range(1, N):
+      LiList[i] = target_difference[i] - target_difference[i-1] + N * LiList[i-1]
+      LiList[i] /= N
 
-    error = 0
-
-    # reduces the brightness error by calculating the average distance from the gray image
-    for yi in h:
-      for xi in w:
-        error += (final_image[yi][xi] - gray_image[yi][xi])[0]
-
-    error /= (width * height)
-    error = np.uint8(error)
-
-    for yi in h:
-      for xi in w:
-        final_image[yi][xi] -= error
+    for i in range(height):
+      for j in range(width):
+        final_image[i][j] = LiList[i * width + j]
     
     cv.imwrite("output.png", final_image)
