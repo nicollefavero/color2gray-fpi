@@ -1,108 +1,89 @@
-import numpy as np
-from cv2 import cv2 as cv
-import matplotlib as plt
-import math
-
-def crunch(alpha, x):
-  # This function allows us to compress large-amplitude values
-  # into the valid range, while leaving small yet significant
-  # variations around zero almost untouched
-  return alpha * math.tanh(x/alpha)
+import color2gray as c2g
+from tkinter import * 
+from PIL import Image, ImageTk, ImageDraw, ImageOps, ImageEnhance
+import matplotlib.pyplot as plt 
 
 
-def calculateTargetDifference(alpha, theta, delta_lum, delta_A, delta_B):
-  # normalized vector defined by theta (relative to the delta_A 
-  delta_crom_norm = math.sqrt(math.pow(delta_A, 2) + math.pow(delta_B, 2))
-  dot_product_AB_theta = delta_A * math.cos(theta) + delta_B * math.sin(theta)
-  
-  if np.abs(delta_lum) > crunch(alpha, delta_crom_norm):
-    return delta_lum
+class ImageSelectionView(Tk):
+    def __init__(self):
+        Tk.__init__(self)
+        self.setupInterface()
 
-  elif dot_product_AB_theta >= 0:
-    return crunch(alpha, delta_crom_norm)
+    def setupInterface(self):
 
-  else:
-    return crunch(alpha, -delta_crom_norm)
+        # Dropdown menu options
+        imageOptions = [
+            "Sunset",
+            "Butterfly",
+            "Car",
+            "Construction",
+            "Hidden Number",
+            "Island Map"
+        ]
 
-if __name__ == "__main__":
+        # Setups dropdown menu
+        rowFrame = Frame(self, bd=3)
+        self.menuValue = StringVar(self)
+        self.menuValue.set(imageOptions[0])
+        self.imageOptionsDropDown = OptionMenu(rowFrame, self.menuValue, *imageOptions, command=self.changeImage)
+        self.imageOptionsDropDown.pack(side='left')
+        rowFrame.pack(fill='x')
 
-    # edit here image name to be convert to grayscale
-    image_name = "original_color_image.png"
-    original_image = cv.imread(image_name)
-    image_lab = cv.cvtColor(original_image, cv.COLOR_BGR2LAB)
+        # Setups canvas
+        self.canvas = Canvas(self, bd = 0, highlightthickness = 0, width = 400, height = 250)
+        self.canvas.pack(fill = "both", expand = 1)
+        self.originalImage = Image.open('images/sunset.png').convert('RGB')
+        self.originalImage.thumbnail((512, 512))
 
-    # image attributes
-    height, width= image_lab.shape[:2]
-    h = range(height)
-    w = range(width)
+        # Setups images
+        self.photoshopGrayImage = Image.open('images/sunsetGray.png').convert('RGB')
+        self.photoshopGrayImage.thumbnail((512, 512))
 
-    # defaults are alpha = 10, theta = 45, neighbourhood_size = image_size
-    alpha = 10
-    theta = 45
-    neighbourhood_size = (width, height)
+        c2g.colorToGray('images/sunset.png')
+        self.colorToGrayImage = Image.open('output.png').convert('RGB')
+        self.colorToGrayImage.thumbnail((512, 512))
 
-    hn = range(neighbourhood_size[1])
-    wn = range(neighbourhood_size[0])
+        self.originalImageTk = ImageTk.PhotoImage(self.originalImage)
+        self.photoshopGrayImageTk = ImageTk.PhotoImage(self.photoshopGrayImage)
+        self.colorToGrayImageTk = ImageTk.PhotoImage(self.colorToGrayImage)
 
-    # convert the original image to normal grayscale and initialize output
-    gray_image = cv.cvtColor(original_image, cv.COLOR_BGR2GRAY)
-    final_image = np.zeros_like(original_image)
+        self.originalImageItem = self.canvas.create_image(10, 30, anchor = 'nw', image = self.originalImageTk)
+        self.photoshopGrayImageItem = self.canvas.create_image(self.originalImage.size[0] + 20, 30, anchor = 'nw', image = self.photoshopGrayImageTk)
+        self.colorToGrayImageItem = self.canvas.create_image(self.originalImage.size[0] + self.photoshopGrayImage.size[0] + 40, 30, anchor = 'nw', image = self.colorToGrayImageTk)
 
-    # initialize target difference matrix
-    target_difference = np.zeros((height, width), dtype=float)
+        self.canvas.config(width = self.originalImage.size[0] * 3 + 50, height = self.originalImage.size[1] * 1.3)
 
-    # Lumiance List, Channel A List, Channel B List
-    LiList = []
-    AiList = []
-    BiList = []
-
-    # i pixel and j is its neighbour
-    # go through each pixel i of the original image
-    for yi in h:
-      for xi in w:
-
-        Li, Ai, Bi = image_lab[yi][xi]
-        LiList.append(Li)
-        AiList.append(Ai)
-        BiList.append(Bi)
-
-    # go through each pixel j of the neighbourhood size
-    for yj in hn:
-      for xj in wn:
-        Lj, Aj, Bj = image_lab[yj][xj]
-
-        delta_L = int(LiList[yj]) - Lj   # black - white
-        delta_A = int(AiList[yj]) - Aj   # blue - yellow
-        delta_B = int(BiList[yj]) - Bj   # green - red
-
-        # a pseudocode to explain how target difference works: target_difference[yi][xi][yj][xj] = int()
-        # here, a simplified version because the neighbours are the same for a given pixel
-        target_difference[yj][xj] = calculateTargetDifference(alpha, theta, delta_L, delta_A, delta_B)
-
-
-    # solves the optimization using the target differences
-    for yi in hn:
-      for xi in wn:
-        if yi - 1 < 0:
-          target_diff_dim = 0
-        else:
-          target_diff_dim = np.sum(target_difference[yi]) - np.sum(target_difference[yi - 1]) + width * height * LiList[yi * width + xi - 1]
-          target_diff_dim /= (width * height)
+    def changeImage(self, selectedOption):
+        imagePath = ''
+        if selectedOption == 'Sunset':
+            imagePath = 'images/sunset'
+        elif selectedOption == 'Butterfly':
+            imagePath = 'images/butterfly'
+        elif selectedOption == 'Car':
+            imagePath = 'images/car'
+        elif selectedOption == 'Construction':
+            imagePath = 'images/construction'
+        elif selectedOption == 'Hidden Number':
+            imagePath = 'images/hiddenNumber'
+        elif selectedOption == 'Island Map':
+            imagePath = 'images/mapIsland'
         
-        final_image[yi][xi] = target_diff_dim
+        extension = '.png'
 
-    error = 0
+        # Updates the displayed images
+        c2g.colorToGray(imagePath + extension)
+        self.newColorToGrayImage = Image.open('output.png').convert('RGB')
+        self.newColorToGrayTkImage = ImageTk.PhotoImage(self.newColorToGrayImage)
+        self.canvas.itemconfig(self.colorToGrayImageItem, image=self.newColorToGrayTkImage)
 
-    # reduces the brightness error by calculating the average distance from the gray image
-    for yi in h:
-      for xi in w:
-        error += (final_image[yi][xi] - gray_image[yi][xi])[0]
+        self.newOriginalImage = Image.open(imagePath + extension).convert('RGB')
+        self.newOriginalTkImage = ImageTk.PhotoImage(self.newOriginalImage)
+        self.canvas.itemconfig(self.originalImageItem, image=self.newOriginalTkImage)
 
-    error /= (width * height)
-    error = np.uint8(error)
+        self.newPhotoshopImage = Image.open(imagePath + 'Gray' + extension).convert('RGB')
+        self.newPhotoshopTkImage = ImageTk.PhotoImage(self.newPhotoshopImage)
+        self.canvas.itemconfig(self.photoshopGrayImageItem, image=self.newPhotoshopTkImage)
 
-    for yi in h:
-      for xi in w:
-        final_image[yi][xi] -= error
-    
-    cv.imwrite("output.png", final_image)
+
+imageSelectionView = ImageSelectionView()
+imageSelectionView.mainloop()
